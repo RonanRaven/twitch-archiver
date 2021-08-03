@@ -6,69 +6,45 @@
 # Author theneedyguy
 # LICENSE: MIT
 
-
-# Source the virtualenv (only for testing outside of container)
-#. ./venv/bin/activate
-
 # Set variables
-KEY=$STR_KEY
+APP_ID=$STR_APPID
+APP_SECRET=$STR_APPSECRET
 CHANNEL=$STR_CHANNEL
 DESIRED_RES=$STR_RES
 
+token=$(curl -s -X POST "https://id.twitch.tv/oauth2/token?client_id=$APP_ID&client_secret=$APP_SECRET&grant_type=client_credentials" | jq -r '.access_token')
+
+if [[ "${token}" == "" ]]; then
+	echo "Error fetching auth token!"; exit 1
+fi
+
 # To avoid downloading the current stream that might not even be finished we download the second latest vod of the streamer.
 # This will have problems if the streamer has never streamed before but who really cares. This is just a little script.
-STREAMSTATUS=$(curl -s -H "Client-ID: $KEY" -X GET "https://api.twitch.tv/kraken/streams/$CHANNEL" | jq .stream.stream_type)
-if [ $STREAMSTATUS == "null" ]
-then
-    echo "Streamer offline. Downloading latest vod."
-    LATEST_VOD=$(curl -s -H "Client-ID: $KEY" -X GET "https://api.twitch.tv/kraken/channels/$CHANNEL/videos?broadcast_type=archive" | jq '.videos[0] | {url: .url, created_at: .created_at, resolutions: .resolutions}')
+stream_status=$(curl -s -H "Authorization: Bearer ${token}" -H "Client-ID: ${APP_ID}" -X GET "https://api.twitch.tv/helix/streams?user_login=${CHANNEL}" | jq -r .data[].type)
+
+if [[ "${stream_status}" == "live" ]]; then
+    echo "Streamer is live."; vod_offset=1
 else
-    echo "Streamer is streaming. Downloading last vod that is not the current stream."
-    LATEST_VOD=$(curl -s -H "Client-ID: $KEY" -X GET "https://api.twitch.tv/kraken/channels/$CHANNEL/videos?broadcast_type=archive" | jq '.videos[1] | {url: .url, created_at: .created_at, resolutions: .resolutions}')
+    echo "Streamer is offline."; vod_offset=0
 fi
 
-QUALITY=$(echo $LATEST_VOD | jq '.resolutions')
-DATE=$(echo $LATEST_VOD | jq '.created_at' | sed 's/\"//g')
-URL=$(echo $LATEST_VOD | jq '.url' | sed 's/\"//g')
-
-FILE_DATE=$(date -u -D %Y-%m-%dT%TZ -d $DATE +%s)
-echo $FILE_DATE
-echo $(date -d "@$FILE_DATE" +%Y-%m-%d-%H:%M)
-VOD_DATE=$(date -d "@$FILE_DATE" +%Y-%m-%d-%H:%M)
+stream_id=$(curl -s -H "Authorization: Bearer ${token}" -H "Client-ID: ${APP_ID}" -X GET "https://api.twitch.tv/helix/users?login=${CHANNEL}" | jq -r .data[].id)
+if [[ "${stream_id}" == "" ]]; then
+    echo "Error fetching stream id from channel name!"; exit 1
+fi
 
 
-# Helper function to check if a value is in an array
-containsElement () {
-    local e match="$1"
-    shift
-    for e; do [[ "$e" == "$match" ]] && return 0; done
-    return 1
-}
+vod_list=$(curl -s -H "Authorization: Bearer ${token}" -H "Client-ID: $APP_ID" -X GET "https://api.twitch.tv/helix/videos?user_id=${stream_id}?type=archive" | jq -c ".data[${vod_offset}:]" | jq -c '.[] | {created_at: .created_at, url: .url }')
+vod_dir="/vods/"
 
-# Create new array with compatible resolutions for streamlink
-i=0
-for resolution in $(echo $QUALITY | jq -r 'to_entries[]' | jq -r '.key'); do
-    compat_res=$(echo $resolution | sed 's/30//g' | sed 's/chunked/1080p60/g')
-    resolutions[$i]=$compat_res
-    ((i++))
+for vod in $vod_list; do
+    vod_time=$(echo "${vod}" | jq -r .created_at)
+    vod_url=$(echo "${vod}" | jq -r .url)
+    vod_file=$(echo "${vod_dir}vod-${vod_time}.mp4" | sed 's!:!-!g')
+    if [ -f "${vod_file}" ]; then
+        continue
+    fi
+    echo "Downloading ${vod_file}"
+    streamlink "${vod_url}" "${DESIRED_RES}" -o "${vod_file}" --hls-segment-threads 2 --ffmpeg-video-transcode h265 --ffmpeg-audio-transcode aac
 done
-
-# Check if the desired resolition is in the array and then downlaod the video if it doesn't exist yet.
-if containsElement $DESIRED_RES "${resolutions[@]}" ; then
-    # Download the vod in the desired resolution
-    if [ ! -f /opt/streamslurp/vods/vod-${VOD_DATE}.mp4 ]; then
-        echo "File not found. Creating."
-        streamlink $URL $DESIRED_RES  -o "/opt/streamslurp/vods/vod-${VOD_DATE}.mp4" --hls-segment-threads 2
-    else
-        echo "File exists."
-    fi
-else
-    # Download with the best possible resolition
-    if [ ! -f /opt/streamslurp/vods/vod-${VOD_DATE}.mp4 ]; then
-        echo "File not found. Creating."
-        streamlink $URL best -o "/opt/streamslurp/vods/vod-${VOD_DATE}.mp4" --hls-segment-threads 2
-    else
-        echo "File exists."
-    fi
-fi
 

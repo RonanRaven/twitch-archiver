@@ -1,13 +1,13 @@
 version: '2.1'
-
 services:
-  streamslurp:
-    image: ckevi/streamslurp:latest
-    container_name: streamslurp
+  twitch-archiver:
+    image: ronanraven/twitch-archiver:latest
+    container_name: twitch-archiver
     volumes:
-      - ./vods:/opt/streamslurp/vods
+      - ./vods:/vods
     environment:
-      - STR_KEY=
+      - STR_APPID=
+      - STR_APPSECRET=
       - STR_CHANNEL=
       - STR_RES=
     restart: unless-stopped
