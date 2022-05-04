@@ -1,1 +1,2 @@
-streamlink
+--extra-index-url https://alpine-wheels.github.io/index
+streamlink>=4.0.0
