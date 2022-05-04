@@ -1,7 +1,7 @@
 FROM alpine:3.15
 
 #all prerequisites, packages, and setup for python
-RUN apk add --no-cache bash jq curl build-base ffmpeg python3 py3-pip cython libxml2 libxslt
+RUN apk add --update --no-cache bash jq curl build-base ffmpeg python3 python3-dev py3-pip libxml2-dev libxslt-dev
 
 #python requirements install
 COPY ./requirements.txt /tmp/
