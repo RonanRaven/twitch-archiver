@@ -9,5 +9,4 @@ services:
       - STR_APPID=
       - STR_APPSECRET=
       - STR_CHANNEL=
-      - STR_RES=
     restart: unless-stopped

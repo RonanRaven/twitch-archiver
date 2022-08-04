@@ -15,4 +15,4 @@ RUN /usr/bin/fix-permissions /vods/ && /usr/bin/fix-permissions /app/
 WORKDIR /app/
 VOLUME ["/vods/"]
 
-ENTRYPOINT ["bash","-c", "while true; do './app.sh'; sleep 3600; done"]
+CMD ["/bin/bash", "-c", "./app.sh"]
