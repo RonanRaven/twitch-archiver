@@ -1,7 +1,7 @@
-FROM alpine:3.15
+FROM linuxserver/ffmpeg:version-4.4-cli
 
 #all prerequisites, packages, and setup for python
-RUN apk add --update --no-cache bash jq curl build-base ffmpeg python3 python3-dev py3-pip libxml2-dev libxslt-dev
+RUN apt-get update && apt-get install -y jq curl python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
 #python requirements install
 COPY ./requirements.txt /tmp/
@@ -15,4 +15,5 @@ RUN /usr/bin/fix-permissions /vods/ && /usr/bin/fix-permissions /app/
 WORKDIR /app/
 VOLUME ["/vods/"]
 
+ENTRYPOINT [""]
 CMD ["/bin/bash", "-c", "./app.sh"]

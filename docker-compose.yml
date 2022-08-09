@@ -8,5 +8,6 @@ services:
     environment:
       - STR_APPID=
       - STR_APPSECRET=
-      - STR_CHANNEL=
+      - JSON_CONFIG={"name":"jjamjim"}{"name":"theyed_","dir":"yed"}
+    stop_grace_period: 1s
     restart: unless-stopped
